@@ -87,4 +87,93 @@ Os logs são salvos em /var/log/KextMaster.log.
 Contribuições
 
 Contribuições são bem-vindas! Sinta-se à vontade para abrir issues ou pull requests.
+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+
+KextMaster
+KextMaster is a Bash script for macOS that simplifies the installation of kexts (Kernel Extensions) into the /Library/Extensions directory. It provides an interactive interface for installing, replacing, and managing kexts, along with detailed logging for easier debugging.
+
+Features
+
+Kext Installation: Installs kexts into the /Library/Extensions directory.
+Automatic Backup: Backs up existing kexts before replacing them.
+Kext Validation: Checks if the kext is valid and properly signed.
+Cache Reloading: Reloads the kext cache after installation.
+Detailed Logging: Logs all operations to a log file (/var/log/KextMaster.log).
+Interactive Menu: Allows installing multiple kexts without exiting the script.
+Requirements
+
+macOS: Compatible with modern versions of macOS (Catalina and later).
+Root Permissions: The script must be run with superuser (root) privileges.
+How to Use
+
+Download the Script:
+Clone this repository or download the KextMaster.sh file.
+Grant Execution Permissions:
+In the Terminal, run:
+bash
+Copy
+chmod +x KextMaster.sh
+Run the Script:
+Execute the script with:
+bash
+Copy
+./KextMaster.sh
+Follow the Instructions:
+The script will display an interactive menu. Choose option 1 to install a kext.
+Enter the full path to the kext you want to install.
+Confirm the destination path (/Library/Extensions by default).
+The script will back up the existing kext (if any), install the new kext, and reload the cache.
+Check the Logs:
+All logs are saved in /var/log/KextMaster.log.
+Example Usage
+
+bash
+Copy
+====================================
+KextMaster - Installation Menu
+====================================
+1. Install a kext
+2. Exit
+====================================
+Choose an option (1 or 2): 1
+🔍 Enter the path to the kext you want to inject: /Users/henrique/Desktop/EFI/OC/Kexts/USBMap.kext
+Do you want to inject the kext into /Library/Extensions? (y/n): y
+📂 Copying /Users/henrique/Desktop/EFI/OC/Kexts/USBMap.kext to /Library/Extensions...
+🔧 Adjusting permissions...
+♻️ Reloading kext cache...
+✅ Kext successfully injected into /Library/Extensions!
+Logs
+
+All logs are recorded in the file /var/log/KextMaster.log. Example log:
+
+Copy
+2025-01-24_13:46:50 - Starting kext installation at 2025-01-24_13:46:50
+2025-01-24_13:46:57 - 📂 Copying /Users/henrique/Desktop/EFI/OC/Kexts/USBMap.kext to /Library/Extensions...
+2025-01-24_13:46:57 - 🔧 Adjusting permissions...
+2025-01-24_13:46:57 - ♻️ Reloading kext cache...
+2025-01-24_13:46:57 - ✅ Kext successfully injected into /Library/Extensions!
+Frequently Asked Questions
+
+1. Can I install kexts in /System/Library/Extensions?
+
+It is not recommended. The /System/Library/Extensions directory is protected by SIP (System Integrity Protection) and can only be modified if SIP is disabled. Use /Library/Extensions for third-party kexts.
+2. What if the kext is not signed?
+
+The script will warn you if the kext is not signed. You can choose to proceed with the installation, but unsigned kexts may not work correctly on modern versions of macOS.
+3. How do I disable SIP?
+
+Restart in Recovery Mode (Command + R), open the Terminal, and run:
+bash
+Copy
+csrutil disable
+Warning: Disabling SIP can compromise system security. Re-enable it after installation with:
+bash
+Copy
+csrutil enable
+4. Where are the logs saved?
+
+Logs are saved in /var/log/KextMaster.log.
+Contributions
+
+Contributions are welcome! Feel free to open issues or pull requests.
 
