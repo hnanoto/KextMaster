@@ -1,0 +1,211 @@
+#!/bin/bash
+
+# Função para detectar o idioma do sistema
+function detectar_idioma() {
+    LANG=$(echo "$LANG" | cut -d '.' -f 1)  # Remove a codificação (ex: en_US.UTF-8 -> en_US)
+    case "$LANG" in
+        "pt_BR"|"pt_PT")
+            echo "pt"  # Português
+            ;;
+        "en_US"|"en_GB")
+            echo "en"  # Inglês
+            ;;
+        *)
+            echo "en"  # Padrão: Inglês
+            ;;
+    esac
+}
+
+# Carregar mensagens com base no idioma
+IDIOMA=$(detectar_idioma)
+
+if [ "$IDIOMA" == "pt" ]; then
+    MSG_INICIANDO="Iniciando instalação de kext em $(date +%F_%T)"
+    MSG_ERRO_LOG="Não é possível criar o arquivo de log."
+    MSG_ERRO="Erro: $1"
+    MSG_REEXECUTANDO="Reexecutando com permissões administrativas..."
+    MSG_SOLICITAR_KEXT="🔍 Insira o caminho para o kext que deseja injetar: "
+    MSG_KEXT_NAO_ENCONTRADO="O kext fornecido não foi encontrado: $KEXT_PATH"
+    MSG_KEXT_INVALIDO="O caminho fornecido não parece ser um kext válido: $KEXT_PATH"
+    MSG_ASSINATURA_INVALIDA="Aviso: O kext não está assinado corretamente. A instalação pode não ser segura."
+    MSG_CONTINUAR="Deseja continuar mesmo assim? (s/n): "
+    MSG_CANCELADO="Instalação cancelada pelo usuário."
+    MSG_CONFIRMAR_DESTINO="Deseja injetar o kext em $DESTINATION? (s/n): "
+    MSG_NOVO_DESTINO="Insira o novo caminho de destino: "
+    MSG_DESTINO_INEXISTENTE="O caminho de destino não existe: $DESTINATION"
+    MSG_SUBSTITUIR="Um kext com o mesmo nome já existe. Deseja substituí-lo? (s/n): "
+    MSG_BACKUP_FALHA="Falha ao fazer backup do kext existente."
+    MSG_COPIANDO="📂 Copiando $KEXT_PATH para $DESTINATION..."
+    MSG_COPIA_FALHA="Falha ao copiar o kext."
+    MSG_PERMISSOES="🔧 Ajustando permissões..."
+    MSG_PERMISSOES_FALHA="Falha ao ajustar as permissões."
+    MSG_ATRIBUTOS_FALHA="Falha ao ajustar os atributos."
+    MSG_RECARREGANDO="♻️ Recarregando cache do kext..."
+    MSG_CACHE_FALHA="Falha ao recarregar o cache do kext."
+    MSG_SUCESSO="✅ Kext injetado com sucesso em $DESTINATION!"
+    MSG_SAIR="Saindo do KextMaster. Até logo!"
+    MSG_OPCAO_INVALIDA="Opção inválida. Tente novamente."
+    MENU_TITULO="KextMaster - Menu de Instalação"
+    MENU_OPCAO1="1. Instalar um kext"
+    MENU_OPCAO2="2. Sair"
+else
+    MSG_INICIANDO="Starting kext installation at $(date +%F_%T)"
+    MSG_ERRO_LOG="Cannot create log file."
+    MSG_ERRO="Error: $1"
+    MSG_REEXECUTANDO="Re-running with administrative permissions..."
+    MSG_SOLICITAR_KEXT="🔍 Enter the path to the kext you want to inject: "
+    MSG_KEXT_NAO_ENCONTRADO="The provided kext was not found: $KEXT_PATH"
+    MSG_KEXT_INVALIDO="The provided path does not seem to be a valid kext: $KEXT_PATH"
+    MSG_ASSINATURA_INVALIDA="Warning: The kext is not properly signed. Installation may not be safe."
+    MSG_CONTINUAR="Do you want to continue anyway? (y/n): "
+    MSG_CANCELADO="Installation canceled by the user."
+    MSG_CONFIRMAR_DESTINO="Do you want to inject the kext into $DESTINATION? (y/n): "
+    MSG_NOVO_DESTINO="Enter the new destination path: "
+    MSG_DESTINO_INEXISTENTE="The destination path does not exist: $DESTINATION"
+    MSG_SUBSTITUIR="A kext with the same name already exists. Do you want to replace it? (y/n): "
+    MSG_BACKUP_FALHA="Failed to back up the existing kext."
+    MSG_COPIANDO="📂 Copying $KEXT_PATH to $DESTINATION..."
+    MSG_COPIA_FALHA="Failed to copy the kext."
+    MSG_PERMISSOES="🔧 Adjusting permissions..."
+    MSG_PERMISSOES_FALHA="Failed to adjust permissions."
+    MSG_ATRIBUTOS_FALHA="Failed to adjust attributes."
+    MSG_RECARREGANDO="♻️ Reloading kext cache..."
+    MSG_CACHE_FALHA="Failed to reload the kext cache."
+    MSG_SUCESSO="✅ Kext successfully injected into $DESTINATION!"
+    MSG_SAIR="Exiting KextMaster. Goodbye!"
+    MSG_OPCAO_INVALIDA="Invalid option. Try again."
+    MENU_TITULO="KextMaster - Installation Menu"
+    MENU_OPCAO1="1. Install a kext"
+    MENU_OPCAO2="2. Exit"
+fi
+
+# Função para registrar logs
+function log() {
+    echo "$(date +%F_%T) - $1" | tee -a "$LOG_FILE"
+}
+
+# Função para lidar com erros
+function erro() {
+    log "$MSG_ERRO"
+    exit 1
+}
+
+# Verifica se o script está sendo executado como root
+if [ "$(id -u)" -ne 0 ]; then
+    echo "$MSG_REEXECUTANDO"
+    exec sudo "$0" "$@"
+fi
+
+# Define o arquivo de log após elevar as permissões
+LOG_FILE="/var/log/KextMaster.log"
+touch "$LOG_FILE" || erro "$MSG_ERRO_LOG"
+
+log "$MSG_INICIANDO"
+
+# Função para instalar um kext
+function instalar_kext() {
+    # Caminho de destino (agora no /Library/Extensions)
+    DESTINATION="/Library/Extensions"
+
+    # Solicita o caminho do kext a ser injetado
+    read -p "$MSG_SOLICITAR_KEXT" KEXT_PATH
+
+    # Verifica se o arquivo ou diretório do kext existe
+    if [ ! -d "$KEXT_PATH" ]; then
+        log "$MSG_KEXT_NAO_ENCONTRADO"
+        return
+    fi
+
+    # Verifica se é um kext válido
+    if [ ! -d "$KEXT_PATH/Contents" ] || [ ! -f "$KEXT_PATH/Contents/Info.plist" ]; then
+        log "$MSG_KEXT_INVALIDO"
+        return
+    fi
+
+    # Verifica se o kext está assinado
+    if ! spctl --assess --type kext "$KEXT_PATH" >/dev/null 2>&1; then
+        log "$MSG_ASSINATURA_INVALIDA"
+        read -p "$MSG_CONTINUAR" CONTINUE
+        if [[ ! "$CONTINUE" =~ ^[SsYy]$ ]]; then
+            log "$MSG_CANCELADO"
+            return
+        fi
+    fi
+
+    # Confirma o caminho de destino
+    read -p "$MSG_CONFIRMAR_DESTINO" CONFIRMATION
+    if [[ ! "$CONFIRMATION" =~ ^[SsYy]$ ]]; then
+        read -p "$MSG_NOVO_DESTINO" NEW_DEST
+        DESTINATION=${NEW_DEST:-$DESTINATION}
+        if [ ! -d "$DESTINATION" ]; then
+            log "$MSG_DESTINO_INEXISTENTE"
+            return
+        fi
+    fi
+
+    # Verifica se um kext com o mesmo nome já existe
+    if [ -d "$DESTINATION/$(basename "$KEXT_PATH")" ]; then
+        read -p "$MSG_SUBSTITUIR" REPLACE
+        if [[ "$REPLACE" =~ ^[SsYy]$ ]]; then
+            BACKUP_DIR="$DESTINATION/$(basename "$KEXT_PATH")_backup_$(date +%F_%T)"
+            if ! cp -R "$DESTINATION/$(basename "$KEXT_PATH")" "$BACKUP_DIR"; then
+                log "$MSG_BACKUP_FALHA"
+                return
+            fi
+        else
+            log "$MSG_CANCELADO"
+            return
+        fi
+    fi
+
+    # Copia o kext para o destino
+    log "$MSG_COPIANDO"
+    if ! cp -R "$KEXT_PATH" "$DESTINATION"; then
+        log "$MSG_COPIA_FALHA"
+        return
+    fi
+
+    # Ajusta as permissões
+    log "$MSG_PERMISSOES"
+    if ! chown -R root:wheel "$DESTINATION/$(basename "$KEXT_PATH")"; then
+        log "$MSG_PERMISSOES_FALHA"
+        return
+    fi
+
+    if ! chmod -R 755 "$DESTINATION/$(basename "$KEXT_PATH")"; then
+        log "$MSG_ATRIBUTOS_FALHA"
+        return
+    fi
+
+    # Recarrega o cache do kext
+    log "$MSG_RECARREGANDO"
+    if ! kextcache -i /; then
+        log "$MSG_CACHE_FALHA"
+    else
+        log "$MSG_SUCESSO"
+    fi
+}
+
+# Menu interativo
+while true; do
+    echo "===================================="
+    echo "$MENU_TITULO"
+    echo "===================================="
+    echo "$MENU_OPCAO1"
+    echo "$MENU_OPCAO2"
+    echo "===================================="
+    read -p "Choose an option (1 or 2): " OPCAO
+
+    case $OPCAO in
+        1)
+            instalar_kext
+            ;;
+        2)
+            echo "$MSG_SAIR"
+            exit 0
+            ;;
+        *)
+            echo "$MSG_OPCAO_INVALIDA"
+            ;;
+    esac
+done
